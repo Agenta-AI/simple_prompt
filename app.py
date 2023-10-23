@@ -1,9 +1,5 @@
-import os
-
 import openai
-from agenta import FloatParam, TextParam, post
 import agenta as ag
-from fastapi import Body
 
 agenta.init()
 ag.config.default(
@@ -11,7 +7,7 @@ ag.config.default(
     prompt_template=TextParam("Summarize the following text: {text}")
 )
 
-@post
+@entrypoint
 def generate(
     text: str
 ) -> str:
