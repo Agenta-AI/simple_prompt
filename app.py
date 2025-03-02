@@ -1,21 +1,32 @@
 from openai import OpenAI
+from pydantic import BaseModel, Field
+from agenta.sdk.types import PromptTemplate
+
 import agenta as ag
-client = OpenAI()
+import litellm
+
+litellm.drop_params = True
+litellm.callbacks = [ag.callbacks.litellm_handler()]
+
 ag.init()
-ag.config.default(
-    temperature=ag.FloatParam(0.9),
-    prompt_template=ag.TextParam("Summarize the following text: {text}"),
-)
 
-
-@ag.entrypoint
-def generate(text: str) -> str:
-    prompt = ag.config.prompt_template.format(text=text)
-    chat_completion = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=ag.config.temperature,
+class MyConfig(BaseModel):
+    prompt: PromptTemplate = Field(
+        default=PromptTemplate(
+            system_prompt="You are a very good summarizer. Create summary from the following article:",
+            user_prompt="{article}"
+        )
     )
 
-    result = chat_completion.choices[0].message.content
+
+@ag.route("/", config_schema=MyConfig)
+@ag.instrument()
+async def generate(article: str) -> str:
+    config = ag.ConfigManager.get_from_route(schema=MyConfig)
+    response = await litellm.acompletion(
+        **{
+            **config.prompt.format(article=article).to_openai_kwargs(),
+        }
+    )
+    result = response.choices[0].message.content
     return result
